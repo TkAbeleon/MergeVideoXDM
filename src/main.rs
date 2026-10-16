@@ -59,6 +59,7 @@ struct App {
     output_dir: PathBuf,
     parallelism: usize,
     include_incomplete: bool,
+    queue_started: bool,
     next_id: u64,
     ffmpeg_status: Result<String, String>,
     notice: Option<String>,
@@ -76,6 +77,7 @@ impl App {
             output_dir: videos,
             parallelism: 2,
             include_incomplete: false,
+            queue_started: false,
             next_id: 1,
             ffmpeg_status: merge::ffmpeg_info(),
             notice: None,
@@ -119,6 +121,7 @@ impl App {
                 Task::none()
             }
             Message::StartQueue => {
+                self.queue_started = true;
                 for job in &mut self.jobs {
                     if matches!(job.state, JobState::Failed(_)) {
                         job.state = JobState::Waiting;
@@ -127,6 +130,7 @@ impl App {
                 self.launch_available()
             }
             Message::RetryJob(id) => {
+                self.queue_started = true;
                 if let Some(job) = self.jobs.iter_mut().find(|job| job.id == id) {
                     if matches!(job.state, JobState::Failed(_)) {
                         job.state = JobState::Waiting;
@@ -149,11 +153,11 @@ impl App {
                         }
                     }
                 }
-                self.launch_available()
+                if self.queue_started { self.launch_available() } else { Task::none() }
             }
             Message::ParallelismChanged(value) => {
                 self.parallelism = value.clamp(1, 4);
-                self.launch_available()
+                if self.queue_started { self.launch_available() } else { Task::none() }
             }
             Message::IncludeIncompleteChanged(value) => {
                 self.include_incomplete = value;
