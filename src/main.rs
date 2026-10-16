@@ -19,7 +19,7 @@ const ICON_CLOCK: &[u8] = include_bytes!("../assets/icons/clock.svg");
 fn main() -> iced::Result {
     iced::application(App::new, App::update, App::view)
         .title("MergeVideoXDM")
-        .theme(|_| None::<Theme>)
+        .theme(|_: &App| None::<Theme>)
         .window_size(iced::Size::new(1080.0, 820.0))
         .run()
 }
@@ -288,7 +288,8 @@ impl App {
             text("·").size(13), text(format!("{} terminé(s)", counts.2)).size(13),
             text("·").size(13), text(format!("{} erreur(s)", counts.3)).size(13),
             space().width(Length::Fill),
-            checkbox("Autoriser une récupération partielle", self.include_incomplete)
+            checkbox(self.include_incomplete)
+                .label("Autoriser une récupération partielle")
                 .on_toggle(Message::IncludeIncompleteChanged)
         ].spacing(8).align_y(Alignment::Center);
 
@@ -331,7 +332,7 @@ impl App {
             .into()
     }
 
-    fn job_card(&self, job: &Job) -> Element<'_, Message> {
+    fn job_card<'a>(&self, job: &'a Job) -> Element<'a, Message> {
         let running = matches!(job.state, JobState::Running);
         let name_input = text_input("nom-de-la-video.mp4", &job.target_name)
             .on_input(move |value| Message::TargetNameChanged(job.id, value))
@@ -386,7 +387,7 @@ impl App {
 }
 
 fn icon<'a>(source: &'static [u8], size: f32) -> Svg<'a> {
-    svg::svg(svg::Handle::from_memory(source))
+    Svg::new(svg::Handle::from_memory(source))
         .width(Length::Fixed(size))
         .height(Length::Fixed(size))
 }

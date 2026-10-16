@@ -302,7 +302,7 @@ pub fn merge(request: MergeRequest) -> Result<MergeReport, String> {
     let (target_name, extension) = validate_target_name(&request.target_name)?;
     fs::create_dir_all(&request.output_dir)
         .map_err(|error| format!("Impossible de créer le dossier de sortie : {error}"))?;
-    let destination = request.output_dir.join(target_name);
+    let destination = request.output_dir.join(&target_name);
     if destination.exists() {
         return Err(format!("Le fichier cible existe déjà ; aucun fichier n'a été écrasé : {}", destination.display()));
     }
