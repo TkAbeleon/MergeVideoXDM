@@ -144,10 +144,16 @@ where
     })?;
 
     let stdout = child.stdout.take().ok_or_else(|| {
-        AppError::new(ErrorKind::Internal, "Le flux de progression FFmpeg est indisponible.")
+        AppError::new(
+            ErrorKind::Internal,
+            "Le flux de progression FFmpeg est indisponible.",
+        )
     })?;
     let stderr = child.stderr.take().ok_or_else(|| {
-        AppError::new(ErrorKind::Internal, "Le flux d'erreurs FFmpeg est indisponible.")
+        AppError::new(
+            ErrorKind::Internal,
+            "Le flux d'erreurs FFmpeg est indisponible.",
+        )
     })?;
 
     // Lire stderr en parallèle évite de bloquer FFmpeg si sa sortie de diagnostic se remplit.
@@ -277,7 +283,10 @@ fn ensure_non_empty(path: &Path) -> Result<(), AppError> {
         )
     })?;
     if metadata.len() == 0 {
-        return Err(AppError::new(ErrorKind::FfmpegExecution, "FFmpeg a produit un fichier vide."));
+        return Err(AppError::new(
+            ErrorKind::FfmpegExecution,
+            "FFmpeg a produit un fichier vide.",
+        ));
     }
     Ok(())
 }
@@ -290,7 +299,10 @@ fn write_manifest(paths: &[PathBuf], manifest_path: &Path) -> Result<(), AppErro
         )
     })?;
     writeln!(file, "ffconcat version 1.0").map_err(|error| {
-        AppError::new(ErrorKind::Filesystem, format!("Écriture du manifeste impossible : {error}"))
+        AppError::new(
+            ErrorKind::Filesystem,
+            format!("Écriture du manifeste impossible : {error}"),
+        )
     })?;
 
     for path in paths {
@@ -302,7 +314,10 @@ fn write_manifest(paths: &[PathBuf], manifest_path: &Path) -> Result<(), AppErro
         })?;
         let value = absolute.to_string_lossy().replace('\\', "/");
         writeln!(file, "file '{}'", value.replace('\'', "'\\''")).map_err(|error| {
-            AppError::new(ErrorKind::Filesystem, format!("Écriture du manifeste impossible : {error}"))
+            AppError::new(
+                ErrorKind::Filesystem,
+                format!("Écriture du manifeste impossible : {error}"),
+            )
         })?;
     }
     Ok(())

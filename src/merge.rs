@@ -7,7 +7,10 @@ use tempfile::Builder as TempBuilder;
 
 use crate::domain::{MergeReport, MergeRequest, ProgressUpdate};
 use crate::errors::{AppError, ErrorKind};
-use crate::{ffmpeg, xdm::{self, XdmSegment}};
+use crate::{
+    ffmpeg,
+    xdm::{self, XdmSegment},
+};
 
 pub fn merge<F>(request: MergeRequest, mut on_progress: F) -> Result<MergeReport, AppError>
 where
@@ -27,11 +30,18 @@ where
         &mut on_progress,
         0.02,
         format!("Lecture XDM {}", state.version),
-        format!("{} segments référencés dans {}", state.segments.len(), state.state_file.display()),
+        format!(
+            "{} segments référencés dans {}",
+            state.segments.len(),
+            state.state_file.display()
+        ),
     );
 
     if state.segments.is_empty() {
-        return Err(AppError::new(ErrorKind::CorruptXdmState, "La base XDM ne contient aucun segment."));
+        return Err(AppError::new(
+            ErrorKind::CorruptXdmState,
+            "La base XDM ne contient aucun segment.",
+        ));
     }
 
     fs::create_dir_all(&request.output_dir).map_err(|error| {
@@ -72,7 +82,10 @@ where
         }
 
         if !path.is_file() {
-            missing.push(format!("Segment absent : {}", path.file_name().unwrap_or_default().to_string_lossy()));
+            missing.push(format!(
+                "Segment absent : {}",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            ));
             continue;
         }
 
@@ -83,14 +96,20 @@ where
             )
         })?;
         if metadata.len() == 0 {
-            missing.push(format!("Segment vide : {}", path.file_name().unwrap_or_default().to_string_lossy()));
+            missing.push(format!(
+                "Segment vide : {}",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            ));
             continue;
         }
         if !segment.is_finished() && !request.include_incomplete {
             continue;
         }
         readable_count += 1;
-        streams.entry(segment.stream_index).or_default().push((segment, path));
+        streams
+            .entry(segment.stream_index)
+            .or_default()
+            .push((segment, path));
     }
 
     let partial = !unfinished.is_empty() || !missing.is_empty();
@@ -130,7 +149,10 @@ where
         .prefix(".mergevideoxdm-work-")
         .tempdir_in(&output_dir)
         .map_err(|error| {
-            AppError::new(ErrorKind::Filesystem, format!("Création du dossier temporaire impossible : {error}"))
+            AppError::new(
+                ErrorKind::Filesystem,
+                format!("Création du dossier temporaire impossible : {error}"),
+            )
         })?;
 
     let final_temp = TempBuilder::new()
@@ -138,7 +160,10 @@ where
         .suffix(&format!(".{extension}"))
         .tempfile_in(&output_dir)
         .map_err(|error| {
-            AppError::new(ErrorKind::Filesystem, format!("Préparation du fichier cible impossible : {error}"))
+            AppError::new(
+                ErrorKind::Filesystem,
+                format!("Préparation du fichier cible impossible : {error}"),
+            )
         })?;
 
     if stream_ids == [0] {
@@ -207,19 +232,26 @@ where
     if final_target.exists() {
         return Err(AppError::new(
             ErrorKind::OutputConflict,
-            format!("Un autre processus a créé la cible : {}", final_target.display()),
+            format!(
+                "Un autre processus a créé la cible : {}",
+                final_target.display()
+            ),
         ));
     }
-    final_temp.persist_noclobber(&final_target).map_err(|error| {
-        AppError::new(
-            ErrorKind::Filesystem,
-            format!("Impossible d'enregistrer le résultat sans écrasement : {}", error.error),
-        )
-    })?;
+    final_temp
+        .persist_noclobber(&final_target)
+        .map_err(|error| {
+            AppError::new(
+                ErrorKind::Filesystem,
+                format!(
+                    "Impossible d'enregistrer le résultat sans écrasement : {}",
+                    error.error
+                ),
+            )
+        })?;
 
-    let mut detail = format!(
-        "{readable_count} segment(s) assemblé(s) avec FFmpeg, sans réencodage."
-    );
+    let mut detail =
+        format!("{readable_count} segment(s) assemblé(s) avec FFmpeg, sans réencodage.");
     if partial {
         detail.push_str(" Récupération partielle : certains segments sont incomplets ou absents.");
     }
@@ -243,7 +275,10 @@ where
 fn validate_target_name(name: &str) -> Result<(String, String), AppError> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err(AppError::new(ErrorKind::InvalidTarget, "Le nom cible est vide."));
+        return Err(AppError::new(
+            ErrorKind::InvalidTarget,
+            "Le nom cible est vide.",
+        ));
     }
     if trimmed == "."
         || trimmed == ".."
@@ -272,7 +307,9 @@ fn validate_target_name(name: &str) -> Result<(String, String), AppError> {
 }
 
 fn total_duration(values: impl Iterator<Item = f64>) -> f64 {
-    values.filter(|value| value.is_finite() && *value > 0.0).sum()
+    values
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .sum()
 }
 
 fn segment_extension<'a>(segments: impl Iterator<Item = &'a XdmSegment>) -> String {
@@ -286,7 +323,9 @@ fn segment_extension<'a>(segments: impl Iterator<Item = &'a XdmSegment>) -> Stri
             {
                 if !extension.is_empty()
                     && extension.len() <= 8
-                    && extension.chars().all(|character| character.is_ascii_alphanumeric())
+                    && extension
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric())
                 {
                     return extension.to_ascii_lowercase();
                 }
