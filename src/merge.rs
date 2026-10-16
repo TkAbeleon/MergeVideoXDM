@@ -190,42 +190,72 @@ where
         let audio = &streams[&1];
         let video_paths: Vec<PathBuf> = video.iter().map(|(_, path)| path.clone()).collect();
         let audio_paths: Vec<PathBuf> = audio.iter().map(|(_, path)| path.clone()).collect();
-        let video_path = output_temp_dir.path().join(format!(
-            "video.{}",
-            segment_extension(video.iter().map(|(segment, _)| *segment))
-        ));
-        let audio_path = output_temp_dir.path().join(format!(
-            "audio.{}",
-            segment_extension(audio.iter().map(|(segment, _)| *segment))
-        ));
+        let video_seconds =
+            total_duration(video.iter().map(|(segment, _)| segment.duration_seconds));
 
-        ffmpeg::concat(
-            &video_paths,
-            &output_temp_dir.path().join("video.ffconcat"),
-            &video_path,
-            total_duration(video.iter().map(|(segment, _)| segment.duration_seconds)),
-            "Assemblage de la piste vidéo",
-            (0.03, 0.43),
-            &mut on_progress,
-        )?;
-        ffmpeg::concat(
-            &audio_paths,
-            &output_temp_dir.path().join("audio.ffconcat"),
-            &audio_path,
-            total_duration(audio.iter().map(|(segment, _)| segment.duration_seconds)),
-            "Assemblage de la piste audio",
-            (0.43, 0.72),
-            &mut on_progress,
-        )?;
-        ffmpeg::mux(
-            &video_path,
-            &audio_path,
+        // Chemin rapide : un seul processus FFmpeg, sans fichier intermédiaire.
+        let single_pass = ffmpeg::concat_mux(
+            &ffmpeg::TrackPaths {
+                video: &video_paths,
+                audio: &audio_paths,
+            },
+            output_temp_dir.path(),
             final_temp.path(),
             &extension,
-            total_duration(video.iter().map(|(segment, _)| segment.duration_seconds)),
-            (0.72, 0.98),
+            video_seconds,
+            (0.03, 0.98),
             &mut on_progress,
-        )?;
+        );
+
+        // Repli : l'ancien enchaînement concat vidéo → concat audio → mux, plus lent
+        // (deux fichiers intermédiaires) mais éprouvé, si la passe unique échoue.
+        if let Err(error) = single_pass {
+            if error.kind != ErrorKind::FfmpegExecution {
+                return Err(error);
+            }
+            emit(
+                &mut on_progress,
+                0.03,
+                "Assemblage en trois étapes",
+                "La passe unique a échoué ; nouvelle tentative avec fichiers intermédiaires.",
+            );
+            let video_path = output_temp_dir.path().join(format!(
+                "video.{}",
+                segment_extension(video.iter().map(|(segment, _)| *segment))
+            ));
+            let audio_path = output_temp_dir.path().join(format!(
+                "audio.{}",
+                segment_extension(audio.iter().map(|(segment, _)| *segment))
+            ));
+
+            ffmpeg::concat(
+                &video_paths,
+                &output_temp_dir.path().join("video-fallback.ffconcat"),
+                &video_path,
+                video_seconds,
+                "Assemblage de la piste vidéo",
+                (0.03, 0.43),
+                &mut on_progress,
+            )?;
+            ffmpeg::concat(
+                &audio_paths,
+                &output_temp_dir.path().join("audio-fallback.ffconcat"),
+                &audio_path,
+                total_duration(audio.iter().map(|(segment, _)| segment.duration_seconds)),
+                "Assemblage de la piste audio",
+                (0.43, 0.72),
+                &mut on_progress,
+            )?;
+            ffmpeg::mux(
+                &video_path,
+                &audio_path,
+                final_temp.path(),
+                &extension,
+                video_seconds,
+                (0.72, 0.98),
+                &mut on_progress,
+            )?;
+        }
     }
 
     // Re-vérification juste avant le renommage : ne jamais écraser une cible concurrente.

@@ -1,4 +1,5 @@
 //! Interface isolée avec le binaire FFmpeg du système.
+use std::ffi::OsString;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -122,6 +123,96 @@ where
         on_progress,
     )?;
     ensure_non_empty(destination)
+}
+
+/// Segments d'une piste vidéo et d'une piste audio à assembler en une seule passe.
+pub struct TrackPaths<'a> {
+    pub video: &'a [PathBuf],
+    pub audio: &'a [PathBuf],
+}
+
+/// Assemble une piste vidéo et une piste audio dans le fichier final avec **un seul**
+/// processus FFmpeg : chaque piste est lue par son propre démultiplexeur `concat`, puis
+/// les flux sont copiés tels quels dans le conteneur cible.
+///
+/// Comparé à « concat vidéo → concat audio → mux », cela évite d'écrire (puis de relire)
+/// deux fichiers intermédiaires aussi gros que la vidéo téléchargée.
+pub fn concat_mux<F>(
+    tracks: &TrackPaths<'_>,
+    work_dir: &Path,
+    destination: &Path,
+    extension: &str,
+    expected_seconds: f64,
+    progress_range: (f32, f32),
+    on_progress: &mut F,
+) -> Result<(), AppError>
+where
+    F: FnMut(ProgressUpdate),
+{
+    let video_manifest = work_dir.join("video.ffconcat");
+    let audio_manifest = work_dir.join("audio.ffconcat");
+    write_manifest(tracks.video, &video_manifest)?;
+    write_manifest(tracks.audio, &audio_manifest)?;
+
+    let mut command = Command::new("ffmpeg");
+    command.args(concat_mux_args(
+        &video_manifest,
+        &audio_manifest,
+        destination,
+        extension,
+    ));
+
+    run_with_progress(
+        command,
+        expected_seconds,
+        "Assemblage audio/vidéo",
+        progress_range,
+        on_progress,
+    )?;
+    ensure_non_empty(destination)
+}
+
+fn concat_mux_args(
+    video_manifest: &Path,
+    audio_manifest: &Path,
+    destination: &Path,
+    extension: &str,
+) -> Vec<OsString> {
+    let mut args: Vec<OsString> = [
+        "-hide_banner",
+        "-nostdin",
+        "-loglevel",
+        "warning",
+        "-y",
+        "-progress",
+        "pipe:1",
+        "-nostats",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+    ]
+    .iter()
+    .map(OsString::from)
+    .collect();
+    args.push(video_manifest.into());
+    args.extend(
+        ["-f", "concat", "-safe", "0", "-i"]
+            .iter()
+            .map(OsString::from),
+    );
+    args.push(audio_manifest.into());
+    args.extend(
+        ["-map", "0:v:0", "-map", "1:a:0", "-c", "copy"]
+            .iter()
+            .map(OsString::from),
+    );
+    if matches!(extension, "mp4" | "m4v") {
+        args.extend(["-movflags", "+faststart"].iter().map(OsString::from));
+    }
+    args.push(destination.into());
+    args
 }
 
 fn run_with_progress<F>(
@@ -325,7 +416,9 @@ fn write_manifest(paths: &[PathBuf], manifest_path: &Path) -> Result<(), AppErro
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_clock, ProgressUpdate};
+    use std::path::{Path, PathBuf};
+
+    use super::{concat_mux, concat_mux_args, parse_clock, ProgressUpdate, TrackPaths};
 
     #[test]
     fn parses_ffmpeg_clock_format() {
@@ -342,5 +435,133 @@ mod tests {
             message: "75 %".into(),
         };
         assert!((0.0..=1.0).contains(&update.fraction));
+    }
+
+    #[test]
+    fn concat_mux_args_map_one_video_and_one_audio_input() {
+        let args: Vec<String> = concat_mux_args(
+            Path::new("/w/video.ffconcat"),
+            Path::new("/w/audio.ffconcat"),
+            Path::new("/o/out.mp4"),
+            "mp4",
+        )
+        .into_iter()
+        .map(|value| value.to_string_lossy().into_owned())
+        .collect();
+
+        assert_eq!(args.iter().filter(|a| *a == "-i").count(), 2);
+        assert!(args.windows(2).any(|w| w == ["-map", "0:v:0"]));
+        assert!(args.windows(2).any(|w| w == ["-map", "1:a:0"]));
+        assert!(args.windows(2).any(|w| w == ["-movflags", "+faststart"]));
+        assert_eq!(args.last().map(String::as_str), Some("/o/out.mp4"));
+    }
+
+    #[test]
+    fn concat_mux_args_skip_faststart_for_non_mp4() {
+        let args = concat_mux_args(Path::new("v"), Path::new("a"), Path::new("out.mkv"), "mkv");
+        assert!(!args.iter().any(|a| a == "+faststart"));
+    }
+
+    /// Génère de vrais segments MPEG-TS (vidéo seule, audio seul) comme le fait XDM pour
+    /// du HLS à pistes séparées. Retourne `None` si FFmpeg n'est pas installé.
+    fn synthetic_segments(
+        dir: &Path,
+        name: &str,
+        input: &[&str],
+        codec: &[&str],
+    ) -> Option<Vec<PathBuf>> {
+        let pattern = dir.join(format!("{name}-%03d.ts"));
+        let status = std::process::Command::new("ffmpeg")
+            .args(["-v", "error", "-y"])
+            .args(input)
+            .args(["-t", "6"])
+            .args(codec)
+            .args([
+                "-f",
+                "segment",
+                "-segment_time",
+                "2",
+                "-segment_format",
+                "mpegts",
+            ])
+            .arg(&pattern)
+            .status()
+            .ok()?;
+        if !status.success() {
+            return None;
+        }
+        let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
+            .ok()?
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|file| file.to_str())
+                    .is_some_and(|file| file.starts_with(name) && file.ends_with(".ts"))
+            })
+            .collect();
+        files.sort();
+        Some(files)
+    }
+
+    #[test]
+    fn concat_mux_produces_a_playable_file_with_both_tracks() {
+        let dir = std::env::temp_dir().join(format!("mvxdm-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let video = synthetic_segments(
+            &dir,
+            "v",
+            &["-f", "lavfi", "-i", "testsrc=size=160x120:rate=25"],
+            &["-c:v", "libx264", "-g", "50", "-pix_fmt", "yuv420p"],
+        );
+        let audio = synthetic_segments(
+            &dir,
+            "a",
+            &["-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100"],
+            &["-c:a", "aac"],
+        );
+        let (Some(video), Some(audio)) = (video, audio) else {
+            eprintln!("FFmpeg indisponible (ou sans libx264) : test ignoré");
+            let _ = std::fs::remove_dir_all(&dir);
+            return;
+        };
+        assert!(video.len() >= 2 && audio.len() >= 2);
+
+        let output = dir.join("out.mp4");
+        let mut last_fraction = 0.0_f32;
+        concat_mux(
+            &TrackPaths {
+                video: &video,
+                audio: &audio,
+            },
+            &dir,
+            &output,
+            "mp4",
+            6.0,
+            (0.03, 0.98),
+            &mut |update: ProgressUpdate| last_fraction = update.fraction,
+        )
+        .expect("l'assemblage en une passe doit réussir");
+
+        assert!((last_fraction - 0.98).abs() < f32::EPSILON);
+        let probe = std::process::Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_type",
+                "-of",
+                "csv=p=0",
+            ])
+            .arg(&output)
+            .output();
+        if let Ok(probe) = probe {
+            let streams = String::from_utf8_lossy(&probe.stdout);
+            assert!(
+                streams.contains("video") && streams.contains("audio"),
+                "{streams}"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
