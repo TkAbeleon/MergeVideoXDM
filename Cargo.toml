@@ -16,6 +16,34 @@ tempfile = "3.23"
 url = "2.5"
 percent-encoding = "2.3"
 
+[package.metadata.deb]
+maintainer = "TkAbeleon"
+copyright = "2026, TkAbeleon"
+extended-description = "Interface de bureau pour reconstruire des vidéos issues de téléchargements temporaires XDM en utilisant FFmpeg, sans réencodage et sans modifier les fichiers sources."
+depends = ["ffmpeg", "$auto"]
+section = "video"
+priority = "optional"
+assets = [
+    ["target/release/mergevideoxdm", "usr/bin/", "755"],
+    ["packaging/mergevideoxdm.desktop", "usr/share/applications/", "644"],
+    ["assets/icons/app-mark.svg", "usr/share/icons/hicolor/scalable/apps/mergevideoxdm.svg", "644"],
+    ["README.md", "usr/share/doc/mergevideoxdm/README.md", "644"],
+    ["LICENSE", "usr/share/doc/mergevideoxdm/copyright", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "mergevideoxdm"
+assets = [
+    { source = "target/release/mergevideoxdm", dest = "/usr/bin/mergevideoxdm", mode = "755" },
+    { source = "packaging/mergevideoxdm.desktop", dest = "/usr/share/applications/mergevideoxdm.desktop", mode = "644" },
+    { source = "assets/icons/app-mark.svg", dest = "/usr/share/icons/hicolor/scalable/apps/mergevideoxdm.svg", mode = "644" },
+    { source = "README.md", dest = "/usr/share/doc/mergevideoxdm/README.md", doc = true, mode = "644" },
+    { source = "LICENSE", dest = "/usr/share/licenses/mergevideoxdm/LICENSE", doc = true, mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+ffmpeg = "*"
+
 [profile.release]
 opt-level = "z"
 lto = true

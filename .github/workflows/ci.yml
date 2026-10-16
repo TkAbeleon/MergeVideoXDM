@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  test-build:
-    name: Test and build (${{ matrix.arch }})
+  test-build-package:
+    name: Test, build and package (${{ matrix.arch }})
     strategy:
       fail-fast: false
       matrix:
@@ -27,10 +27,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Linux build dependencies
+      - name: Install Linux build and packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libx11-dev libxkbcommon-dev \
+          sudo apt-get install -y build-essential pkg-config dpkg-dev libx11-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev \
             libxcb-xfixes0-dev libxcb-randr0-dev libxcb-xinerama0-dev libxcb-cursor-dev \
             libdbus-1-dev
@@ -41,14 +41,37 @@ jobs:
           targets: ${{ matrix.target }}
           components: rustfmt, clippy
 
+      - name: Install Linux packagers
+        run: |
+          cargo install cargo-deb --locked
+          cargo install cargo-generate-rpm --locked
+
       - name: Format Rust sources
-        run: cargo fmt --all
+        run: cargo fmt --all -- --check
 
       - name: Run tests
         run: cargo test --all-targets
 
       - name: Build optimized binary
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build Debian package
+        run: |
+          mkdir -p dist
+          cargo deb --no-build --target ${{ matrix.target }} \
+            --output "dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb"
+
+      - name: Build RPM package
+        run: |
+          cargo generate-rpm --target ${{ matrix.target }} \
+            --output "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
+
+      - name: Verify package metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb --info "dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb"
+          test -s "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
 
       - name: Stage portable archive
         shell: bash
@@ -62,14 +85,18 @@ jobs:
           install -m 644 assets/icons/app-mark.svg "dist/${package}/mergevideoxdm.svg"
           install -m 755 packaging/install.sh "dist/${package}/install.sh"
           tar -C dist -czf "dist/${package}.tar.gz" "${package}"
-          sha256sum "dist/${package}.tar.gz" > "dist/${package}.tar.gz.sha256"
+          sha256sum "dist/${package}.tar.gz" \
+            "dist/${package}.deb" "dist/${package}.rpm" \
+            > "dist/MergeVideoXDM-linux-${{ matrix.arch }}.sha256"
 
-      - name: Upload Linux archive
+      - name: Upload Linux packages and archive
         uses: actions/upload-artifact@v4
         with:
           name: MergeVideoXDM-linux-${{ matrix.arch }}
           path: |
             dist/MergeVideoXDM-linux-${{ matrix.arch }}.tar.gz
-            dist/MergeVideoXDM-linux-${{ matrix.arch }}.tar.gz.sha256
+            dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb
+            dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm
+            dist/MergeVideoXDM-linux-${{ matrix.arch }}.sha256
           if-no-files-found: error
           retention-days: 14

@@ -9,7 +9,9 @@ MergeVideoXDM utilise Rust et Iced, une interface graphique native sans navigate
 ## Fonctionnalités
 
 - Sélection de **plusieurs dossiers en une seule opération**.
-- File d'attente avec état indépendant pour chaque dossier.
+- Tableau de bord de file d'attente avec compteurs distincts : attente, en cours, terminées et erreurs.
+- Interface réorganisée : action principale visible, choix du parallélisme près des commandes et dossier de sortie clairement identifié.
+- Cartes individuelles avec nom de sortie, progression, état visuel, journal et diagnostic détaillé.
 - Nom de fichier cible et chemin de sortie configurables.
 - Traitement configurable de 1 à 4 tâches en parallèle.
 - Barre de progression par tâche basée sur les événements de progression de FFmpeg ; l'étape de traitement est également affichée.
@@ -25,15 +27,41 @@ MergeVideoXDM utilise Rust et Iced, une interface graphique native sans navigate
 
 | Composant | État |
 |---|---|
-| Linux x86_64 | Cible CI |
-| Linux ARM64 / aarch64 | Cible CI |
+| Linux x86_64 | Cible CI et paquets `.deb` / `.rpm` |
+| Linux ARM64 / aarch64 | Cible CI et paquets `.deb` / `.rpm` |
 | X11 | Activé |
 | Wayland | Activé |
-| FFmpeg | Fourni par le système |
+| FFmpeg | Fourni par le système ; requis à l'exécution |
 | XDM 8.0.29 | Adaptateur implémenté ; tests unitaires du format |
 | Autres versions XDM | Architecture prête pour des adaptateurs ; compatibilité non validée |
 
-La compatibilité du binaire avec différentes distributions dépend aussi de leurs bibliothèques système et portails de sélection de dossiers. La CI Linux est configurée pour compiler sur les runners x86_64 et ARM64 ; elle ne garantit pas que chaque paquet de chaque distribution sera binaire-compatible.
+La compatibilité du binaire avec différentes distributions dépend aussi de leurs bibliothèques système et portails de sélection de dossiers. La CI Linux compile et empacte les binaires x86_64 et ARM64 ; elle ne garantit pas que chaque paquet fonctionnera sur toutes les versions de distribution.
+
+## Installation
+
+Télécharge le paquet correspondant à l'architecture de ta machine depuis les artefacts GitHub Actions ou la page Releases. Pour un PC Intel/AMD classique, choisis **x86_64**. ARM64/aarch64 est destiné aux machines ARM.
+
+### Debian, Ubuntu et dérivées (`.deb`)
+
+Dans le dossier contenant le paquet :
+
+    sudo apt install ./MergeVideoXDM-linux-x86_64.deb
+
+APT installe également les dépendances déclarées. Si FFmpeg n'est pas proposé dans les dépôts configurés, active un dépôt compatible avec ta distribution avant d'installer le paquet.
+
+### Fedora et distributions compatibles RPM (`.rpm`)
+
+    sudo dnf install ./MergeVideoXDM-linux-x86_64.rpm
+
+FFmpeg doit être disponible dans les dépôts configurés, qui peuvent dépendre de la distribution. Le paquet déclare FFmpeg et les bibliothèques partagées détectées lors de la génération du RPM.
+
+### Installation portable (`.tar.gz`)
+
+    tar -xzf MergeVideoXDM-linux-x86_64.tar.gz
+    cd MergeVideoXDM-linux-x86_64
+    ./install.sh
+
+L'installation portable place le binaire et les entrées du bureau pour l'utilisateur courant sous `~/.local`. Assure-toi que `~/.local/bin` est présent dans `PATH` si tu souhaites lancer l'application depuis un terminal.
 
 ## Installation de FFmpeg
 
@@ -57,10 +85,10 @@ Arch Linux :
 1. Mets en pause le téléchargement concerné dans XDM et ferme XDM proprement.
 2. Sauvegarde son dossier temporaire avant toute récupération.
 3. Lance MergeVideoXDM.
-4. Clique sur **Ajouter plusieurs dossiers** et sélectionne tous les dossiers de tâches voulus dans le sélecteur.
+4. Clique sur **Ajouter des dossiers** et sélectionne tous les dossiers de tâches voulus dans le sélecteur.
 5. Choisis le dossier de sortie commun, puis ajuste le nom cible pour chaque tâche.
 6. Choisis le nombre de traitements simultanés (commence par 1 ou 2 sur un PC modeste).
-7. Clique sur **Démarrer / relancer**. Déplie **Voir les détails** sur une tâche pour consulter son journal ou le diagnostic d'une erreur.
+7. Clique sur **Lancer les fusions**. Ouvre le journal d'une tâche pour consulter son diagnostic en cas de problème.
 
 Un dossier de tâche XDM est habituellement situé sous :
 
@@ -78,7 +106,7 @@ La barre est calculée à partir des événements de progression émis par FFmpe
 
 Par défaut, tous les segments doivent être présents et marqués Finished. Si des fichiers manquent ou sont incomplets, le programme n'assemble rien en mode sûr et affiche les problèmes détectés.
 
-L'option **Autoriser une récupération partielle** tente d'assembler les segments présents. Le résultat peut être tronqué, présenter des coupures ou s'arrêter avant la fin. Cette option ne peut pas reconstituer des données jamais téléchargées.
+L'option **Autoriser la récupération partielle** tente d'assembler les segments présents. Le résultat peut être tronqué, présenter des coupures ou s'arrêter avant la fin. Cette option ne peut pas reconstituer des données jamais téléchargées.
 
 ## Architecture modulaire
 
@@ -139,18 +167,20 @@ Construire :
     cargo build --release
     ./target/release/mergevideoxdm
 
+Pour créer les paquets depuis les sources, installe cargo-deb et cargo-generate-rpm, compile le binaire en mode release et utilise `cargo deb` ou `cargo generate-rpm`.
+
 Pour une machine modeste, limite le nombre de fusions simultanées à 1 ou 2 : chaque tâche peut lire plusieurs segments sur le disque et démarrer des processus FFmpeg.
 
 ## CI et publications
 
-Le workflow Linux CI vérifie le formatage Rust, lance les tests et compile des binaires pour Linux x86_64 et ARM64. Le workflow Release prépare des archives Linux sur un tag v*, avec un fichier SHA-256.
+Le workflow Linux CI vérifie le formatage Rust, lance les tests et compile pour Linux x86_64 et ARM64. Pour chaque architecture, il produit une archive portable, un paquet Debian `.deb`, un RPM `.rpm` et un fichier SHA-256 pour vérifier l'intégrité.
 
-Créer une publication :
+Créer une publication GitHub Release :
 
     git tag v0.1.0
     git push origin v0.1.0
 
-Les artefacts et le résultat réel des pipelines sont consultables dans [GitHub Actions](https://github.com/TkAbeleon/MergeVideoXDM/actions).
+Le workflow Release publie les archives et les deux formats de paquets dans les pièces jointes de la publication. Les artefacts temporaires de CI et l'état des pipelines se consultent sur [GitHub Actions](https://github.com/TkAbeleon/MergeVideoXDM/actions).
 
 ## Limites fonctionnelles
 
