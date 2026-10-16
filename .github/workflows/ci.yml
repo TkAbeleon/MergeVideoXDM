@@ -94,7 +94,7 @@ jobs:
             > "MergeVideoXDM-linux-${{ matrix.arch }}.sha256")
 
       - name: Upload Linux packages and archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MergeVideoXDM-linux-${{ matrix.arch }}
           path: |
