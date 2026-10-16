@@ -58,9 +58,12 @@ jobs:
             --output "dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb"
           cargo generate-rpm --target ${{ matrix.target }} \
             --output "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
-          dpkg-deb --info "dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb"
-          rpm -qip "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
-          rpm -qlp "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
+          deb="dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb"
+          rpm_file="dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" | grep -F "/usr/bin/mergevideoxdm"
+          rpm -qip "$rpm_file"
+          rpm -qlp "$rpm_file" | grep -Fx "/usr/bin/mergevideoxdm"
 
       - name: Package portable archive and checksums
         shell: bash
