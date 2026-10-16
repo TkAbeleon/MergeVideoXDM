@@ -10,7 +10,7 @@ readme = "README.md"
 
 [dependencies]
 iced = { version = "0.14.0", default-features = false, features = ["tiny-skia", "svg", "tokio", "x11", "wayland", "linux-theme-detection"] }
-rfd = { version = "0.16.0", default-features = false, features = ["xdg-portal", "tokio", "wayland"] }
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal", "tokio", "wayland"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 tempfile = "3.23"
 url = "2.5"
