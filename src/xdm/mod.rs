@@ -78,6 +78,7 @@ pub fn read_state(folder: &Path) -> Result<XdmState, AppError> {
     let candidates = ["chunks.db.1", "chunks.db.2"];
     let mut found_any = false;
     let mut diagnostics = Vec::new();
+    let mut parse_errors = Vec::new();
 
     for filename in candidates {
         let path = folder.join(filename);
@@ -92,20 +93,22 @@ pub fn read_state(folder: &Path) -> Result<XdmState, AppError> {
             )
         })?;
 
+        let mut recognized = false;
         for adapter in adapters() {
             if adapter.recognizes(filename, &bytes) {
-                return adapter.parse(&path, &bytes).map_err(|error| {
-                    AppError::new(
-                        ErrorKind::CorruptXdmState,
-                        format!("{} — {}", adapter.version(), error.message),
-                    )
-                    .with_hint(error.hint.unwrap_or_else(|| {
-                        "Ferme XDM proprement, sauvegarde le dossier, puis réessaie.".into()
-                    }))
-                });
+                recognized = true;
+                match adapter.parse(&path, &bytes) {
+                    Ok(state) => return Ok(state),
+                    Err(error) => parse_errors.push(format!(
+                        "{filename} reconnu comme XDM {} mais invalide : {}",
+                        adapter.version(), error.message
+                    )),
+                }
             }
         }
-        diagnostics.push(format!("{filename}: aucun adaptateur connu ne reconnaît ce format"));
+        if !recognized {
+            diagnostics.push(format!("{filename}: aucun adaptateur connu ne reconnaît ce format"));
+        }
     }
 
     if !found_any {
@@ -118,6 +121,16 @@ pub fn read_state(folder: &Path) -> Result<XdmState, AppError> {
         )
         .with_hint(
             "Sélectionne le dossier temporaire d'une tâche XDM, pas le dossier parent temp.",
+        ));
+    }
+
+    if !parse_errors.is_empty() {
+        return Err(AppError::new(
+            ErrorKind::CorruptXdmState,
+            parse_errors.join("; "),
+        )
+        .with_hint(
+            "Ferme XDM proprement, sauvegarde le dossier de tâche, puis réessaie. Un autre fichier d'état XDM valide a été recherché avant l'échec.",
         ));
     }
 

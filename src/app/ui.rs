@@ -19,6 +19,7 @@ const ICON_ALERT: &[u8] = include_bytes!("../../assets/icons/alert.svg");
 const ICON_CLOCK: &[u8] = include_bytes!("../../assets/icons/clock.svg");
 
 pub(super) fn view(app: &App) -> Element<'_, Message> {
+    let _refresh_sequence = app.tick_nonce;
     let ffmpeg_banner: Element<'_, Message> = match &app.ffmpeg_status {
         Ok(version) => container(
             row![
@@ -307,6 +308,12 @@ fn job_card<'a>(job: &'a Job) -> Element<'a, Message> {
     let progress = progress_bar(0.0..=1.0, snapshot.fraction)
         .height(Length::Fixed(7.0));
 
+    let stage_name = if snapshot.stage.is_empty() {
+        "En attente".to_string()
+    } else {
+        snapshot.stage.clone()
+    };
+
     let details_label = if job.details_open {
         "Masquer les détails"
     } else {
@@ -338,14 +345,7 @@ fn job_card<'a>(job: &'a Job) -> Element<'a, Message> {
             state,
             progress,
             row![
-                text(format!(
-                    "Étape : {}",
-                    if snapshot.stage.is_empty() {
-                        "En attente"
-                    } else {
-                        &snapshot.stage
-                    }
-                ))
+                text(format!("Étape : {stage_name}"))
                 .size(11),
                 space().width(Length::Fill),
                 button(text(details_label))
