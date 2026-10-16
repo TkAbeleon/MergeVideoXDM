@@ -40,7 +40,11 @@ impl XdmSegment {
 
     pub fn file_path(&self, folder: &Path) -> PathBuf {
         let prefix = if self.stream_index == 0 { "1_" } else { "2_" };
-        folder.join(format!("{prefix}{}{}", self.id, safe_url_filename(&self.url)))
+        folder.join(format!(
+            "{prefix}{}{}",
+            self.id,
+            safe_url_filename(&self.url)
+        ))
     }
 }
 
@@ -101,13 +105,16 @@ pub fn read_state(folder: &Path) -> Result<XdmState, AppError> {
                     Ok(state) => return Ok(state),
                     Err(error) => parse_errors.push(format!(
                         "{filename} reconnu comme XDM {} mais invalide : {}",
-                        adapter.version(), error.message
+                        adapter.version(),
+                        error.message
                     )),
                 }
             }
         }
         if !recognized {
-            diagnostics.push(format!("{filename}: aucun adaptateur connu ne reconnaît ce format"));
+            diagnostics.push(format!(
+                "{filename}: aucun adaptateur connu ne reconnaît ce format"
+            ));
         }
     }
 
@@ -147,7 +154,11 @@ pub fn read_state(folder: &Path) -> Result<XdmState, AppError> {
 fn safe_url_filename(value: &str) -> String {
     let raw_name = Url::parse(value)
         .ok()
-        .and_then(|parsed| parsed.path_segments().and_then(|parts| parts.last().map(str::to_owned)))
+        .and_then(|parsed| {
+            parsed
+                .path_segments()
+                .and_then(|parts| parts.last().map(str::to_owned))
+        })
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "segment.ts".into());
     let decoded = percent_decode_str(&raw_name).decode_utf8_lossy();

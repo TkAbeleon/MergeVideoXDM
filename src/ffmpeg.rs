@@ -418,7 +418,7 @@ fn write_manifest(paths: &[PathBuf], manifest_path: &Path) -> Result<(), AppErro
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{concat_mux, concat_mux_args, parse_clock, ProgressUpdate, TrackPaths};
+    use super::{ProgressUpdate, TrackPaths, concat_mux, concat_mux_args, parse_clock};
 
     #[test]
     fn parses_ffmpeg_clock_format() {

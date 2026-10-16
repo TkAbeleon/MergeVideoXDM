@@ -26,11 +26,7 @@ pub(super) fn view(app: &App) -> Element<'_, Message> {
         Ok(version) => container(
             row![
                 icon(ICON_CHECK, 19.0),
-                column![
-                    text("FFmpeg est prêt").size(13),
-                    text(version).size(11)
-                ]
-                .spacing(2),
+                column![text("FFmpeg est prêt").size(13), text(version).size(11)].spacing(2),
                 space().width(Length::Fill),
                 text("Moteur système").size(11)
             ]
@@ -70,12 +66,9 @@ pub(super) fn view(app: &App) -> Element<'_, Message> {
         .spacing(3),
         space().width(Length::Fill),
         container(
-            column![
-                text("LINUX").size(10),
-                text("XDM 8.0.29").size(12)
-            ]
-            .spacing(2)
-            .align_x(Alignment::End)
+            column![text("LINUX").size(10), text("XDM 8.0.29").size(12)]
+                .spacing(2)
+                .align_x(Alignment::End)
         )
         .padding([7, 12])
         .style(container::secondary)
@@ -84,12 +77,9 @@ pub(super) fn view(app: &App) -> Element<'_, Message> {
     .align_y(Alignment::Center);
 
     let add_button = button(
-        row![
-            icon(ICON_FOLDER_PLUS, 18.0),
-            text("Ajouter des dossiers")
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center),
+        row![icon(ICON_FOLDER_PLUS, 18.0), text("Ajouter des dossiers")]
+            .spacing(8)
+            .align_y(Alignment::Center),
     )
     .style(button::secondary)
     .padding([10, 14])
@@ -116,9 +106,13 @@ pub(super) fn view(app: &App) -> Element<'_, Message> {
         add_button,
         space().width(Length::Fill),
         text("Simultanés").size(12),
-        pick_list([1_usize, 2, 3, 4], Some(app.parallelism), Message::ParallelismChanged)
-            .placeholder("Nombre")
-            .width(Length::Fixed(82.0)),
+        pick_list(
+            [1_usize, 2, 3, 4],
+            Some(app.parallelism),
+            Message::ParallelismChanged
+        )
+        .placeholder("Nombre")
+        .width(Length::Fixed(82.0)),
         start_button
     ]
     .spacing(10)
@@ -254,11 +248,7 @@ fn metric_card<'a>(
     container(
         row![
             icon(icon_source, 21.0),
-            column![
-                text(label).size(11),
-                text(value.to_string()).size(23)
-            ]
-            .spacing(3)
+            column![text(label).size(11), text(value.to_string()).size(23)].spacing(3)
         ]
         .spacing(11)
         .align_y(Alignment::Center),
@@ -315,11 +305,7 @@ fn job_card<'a>(job: &'a Job) -> Element<'a, Message> {
 
     let state: Element<'_, Message> = match &job.state {
         JobState::Waiting => status_chip("En attente".into(), ICON_CLOCK, ChipTone::Neutral),
-        JobState::Running => status_chip(
-            snapshot.stage.clone(),
-            ICON_PLAY,
-            ChipTone::Active,
-        ),
+        JobState::Running => status_chip(snapshot.stage.clone(), ICON_PLAY, ChipTone::Active),
         JobState::Done(report) => {
             let label = if report.partial {
                 "Terminé — récupération partielle"
@@ -331,7 +317,15 @@ fn job_card<'a>(job: &'a Job) -> Element<'a, Message> {
             } else {
                 ChipTone::Success
             };
-            let badge = status_chip(label.into(), if report.partial { ICON_ALERT } else { ICON_CHECK }, tone);
+            let badge = status_chip(
+                label.into(),
+                if report.partial {
+                    ICON_ALERT
+                } else {
+                    ICON_CHECK
+                },
+                tone,
+            );
             column![
                 badge,
                 text(format!(
@@ -347,7 +341,11 @@ fn job_card<'a>(job: &'a Job) -> Element<'a, Message> {
             .into()
         }
         JobState::Failed(error) => row![
-            status_chip(error.kind.label().to_string(), ICON_ALERT, ChipTone::Warning),
+            status_chip(
+                error.kind.label().to_string(),
+                ICON_ALERT,
+                ChipTone::Warning
+            ),
             column![
                 text(error.message.clone()).size(11),
                 text(error.hint.clone().unwrap_or_default()).size(11)

@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use iced::{Subscription, Task, Theme};
 use crate::domain::{MergeReport, MergeRequest, ProgressSnapshot, ProgressUpdate};
 use crate::errors::AppError;
 use crate::{ffmpeg, merge};
+use iced::{Subscription, Task, Theme};
 
 #[derive(Debug, Clone)]
 enum JobState {
@@ -106,7 +106,11 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        if self.jobs.iter().any(|job| matches!(job.state, JobState::Running)) {
+        if self
+            .jobs
+            .iter()
+            .any(|job| matches!(job.state, JobState::Running))
+        {
             iced::time::every(Duration::from_millis(250)).map(|_| Message::ProgressTick)
         } else {
             Subscription::none()
@@ -145,7 +149,8 @@ impl App {
                     .pick_folder()
                 {
                     self.output_dir = folder;
-                    self.notice = Some(format!("Dossier de sortie : {}", self.output_dir.display()));
+                    self.notice =
+                        Some(format!("Dossier de sortie : {}", self.output_dir.display()));
                 }
                 Task::none()
             }
@@ -158,8 +163,13 @@ impl App {
                 Task::none()
             }
             Message::RemoveJob(id) => {
-                if self.jobs.iter().any(|job| job.id == id && matches!(job.state, JobState::Running)) {
-                    self.notice = Some("Impossible de retirer une tâche pendant son traitement.".into());
+                if self
+                    .jobs
+                    .iter()
+                    .any(|job| job.id == id && matches!(job.state, JobState::Running))
+                {
+                    self.notice =
+                        Some("Impossible de retirer une tâche pendant son traitement.".into());
                 } else {
                     self.jobs.retain(|job| job.id != id);
                 }
@@ -203,7 +213,8 @@ impl App {
                                 stage: "Terminé".into(),
                                 message: format!("Fichier créé : {}", report.output.display()),
                             });
-                            self.notice = Some(format!("Assemblage terminé : {}", report.output.display()));
+                            self.notice =
+                                Some(format!("Assemblage terminé : {}", report.output.display()));
                             job.state = JobState::Done(report);
                         }
                         Err(error) => {
@@ -219,7 +230,10 @@ impl App {
                                     message: hint.clone(),
                                 });
                             }
-                            self.notice = Some(format!("{} — consulte les détails de la tâche.", error.kind.label()));
+                            self.notice = Some(format!(
+                                "{} — consulte les détails de la tâche.",
+                                error.kind.label()
+                            ));
                             job.state = JobState::Failed(error);
                             job.details_open = true;
                         }
@@ -268,7 +282,10 @@ impl App {
             return false;
         }
 
-        let folder_name = folder.file_name().and_then(|name| name.to_str()).unwrap_or("video");
+        let folder_name = folder
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("video");
         let base_name: String = folder_name
             .chars()
             .map(|character| {
@@ -310,13 +327,18 @@ impl App {
     }
 
     fn launch_available(&mut self) -> Task<Message> {
-        let active = self.jobs.iter().filter(|job| matches!(job.state, JobState::Running)).count();
+        let active = self
+            .jobs
+            .iter()
+            .filter(|job| matches!(job.state, JobState::Running))
+            .count();
         let slots = self.parallelism.saturating_sub(active);
         if slots == 0 {
             return Task::none();
         }
 
-        let waiting: Vec<u64> = self.jobs
+        let waiting: Vec<u64> = self
+            .jobs
             .iter()
             .filter(|job| matches!(job.state, JobState::Waiting))
             .take(slots)
@@ -360,7 +382,9 @@ impl App {
                     })
                     .await
                     .map_err(|error| {
-                        AppError::internal(format!("Le processus de traitement a été interrompu : {error}"))
+                        AppError::internal(format!(
+                            "Le processus de traitement a été interrompu : {error}"
+                        ))
                     })
                     .and_then(|result| result)
                 },
@@ -371,10 +395,26 @@ impl App {
     }
 
     fn counts(&self) -> (usize, usize, usize, usize) {
-        let waiting = self.jobs.iter().filter(|job| matches!(job.state, JobState::Waiting)).count();
-        let running = self.jobs.iter().filter(|job| matches!(job.state, JobState::Running)).count();
-        let done = self.jobs.iter().filter(|job| matches!(job.state, JobState::Done(_))).count();
-        let failed = self.jobs.iter().filter(|job| matches!(job.state, JobState::Failed(_))).count();
+        let waiting = self
+            .jobs
+            .iter()
+            .filter(|job| matches!(job.state, JobState::Waiting))
+            .count();
+        let running = self
+            .jobs
+            .iter()
+            .filter(|job| matches!(job.state, JobState::Running))
+            .count();
+        let done = self
+            .jobs
+            .iter()
+            .filter(|job| matches!(job.state, JobState::Done(_)))
+            .count();
+        let failed = self
+            .jobs
+            .iter()
+            .filter(|job| matches!(job.state, JobState::Failed(_)))
+            .count();
         (waiting, running, done, failed)
     }
 }

@@ -24,8 +24,9 @@ impl XdmStateAdapter for Adapter {
             return false;
         }
         let end = pointer as usize;
-        end.checked_add(FOOTER.len())
-            .is_some_and(|footer_end| footer_end <= bytes.len() && &bytes[end..footer_end] == FOOTER)
+        end.checked_add(FOOTER.len()).is_some_and(|footer_end| {
+            footer_end <= bytes.len() && &bytes[end..footer_end] == FOOTER
+        })
     }
 
     fn parse(&self, path: &Path, bytes: &[u8]) -> Result<XdmState, AppError> {
@@ -45,7 +46,10 @@ impl<'a> Reader<'a> {
 
     fn take(&mut self, count: usize) -> Result<&'a [u8], AppError> {
         let end = self.position.checked_add(count).ok_or_else(|| {
-            AppError::new(ErrorKind::CorruptXdmState, "Débordement pendant la lecture binaire.")
+            AppError::new(
+                ErrorKind::CorruptXdmState,
+                "Débordement pendant la lecture binaire.",
+            )
         })?;
         if end > self.bytes.len() {
             return Err(AppError::new(
@@ -59,15 +63,21 @@ impl<'a> Reader<'a> {
     }
 
     fn i32(&mut self) -> Result<i32, AppError> {
-        Ok(i32::from_le_bytes(self.take(4)?.try_into().expect("taille vérifiée")))
+        Ok(i32::from_le_bytes(
+            self.take(4)?.try_into().expect("taille vérifiée"),
+        ))
     }
 
     fn i64(&mut self) -> Result<i64, AppError> {
-        Ok(i64::from_le_bytes(self.take(8)?.try_into().expect("taille vérifiée")))
+        Ok(i64::from_le_bytes(
+            self.take(8)?.try_into().expect("taille vérifiée"),
+        ))
     }
 
     fn f64(&mut self) -> Result<f64, AppError> {
-        Ok(f64::from_le_bytes(self.take(8)?.try_into().expect("taille vérifiée")))
+        Ok(f64::from_le_bytes(
+            self.take(8)?.try_into().expect("taille vérifiée"),
+        ))
     }
 
     /// Décodage de BinaryWriter.Write(string) : longueur UTF-8 encodée en base 128.
@@ -78,9 +88,9 @@ impl<'a> Reader<'a> {
 
         for _ in 0..5 {
             let byte = self.take(1)?[0];
-            let part = ((byte & 0x7f) as usize)
-                .checked_shl(shift)
-                .ok_or_else(|| AppError::new(ErrorKind::CorruptXdmState, "Longueur de chaîne invalide."))?;
+            let part = ((byte & 0x7f) as usize).checked_shl(shift).ok_or_else(|| {
+                AppError::new(ErrorKind::CorruptXdmState, "Longueur de chaîne invalide.")
+            })?;
             length |= part;
             if byte & 0x80 == 0 {
                 terminated = true;
@@ -90,29 +100,46 @@ impl<'a> Reader<'a> {
         }
 
         if !terminated || length > MAX_STRING_SIZE {
-            return Err(AppError::new(ErrorKind::CorruptXdmState, "Longueur de chaîne .NET invalide."));
+            return Err(AppError::new(
+                ErrorKind::CorruptXdmState,
+                "Longueur de chaîne .NET invalide.",
+            ));
         }
 
         String::from_utf8(self.take(length)?.to_vec()).map_err(|_| {
-            AppError::new(ErrorKind::CorruptXdmState, "Chaîne UTF-8 invalide dans la base XDM.")
+            AppError::new(
+                ErrorKind::CorruptXdmState,
+                "Chaîne UTF-8 invalide dans la base XDM.",
+            )
         })
     }
 }
 
 fn parse_state(path: &Path, bytes: &[u8]) -> Result<XdmState, AppError> {
     if bytes.len() < 8 {
-        return Err(AppError::new(ErrorKind::CorruptXdmState, "Fichier d'état XDM trop petit."));
+        return Err(AppError::new(
+            ErrorKind::CorruptXdmState,
+            "Fichier d'état XDM trop petit.",
+        ));
     }
 
     let pointer = i32::from_le_bytes(bytes[0..4].try_into().expect("taille vérifiée"));
     if pointer < 4 {
-        return Err(AppError::new(ErrorKind::CorruptXdmState, "Pointeur de fin invalide."));
+        return Err(AppError::new(
+            ErrorKind::CorruptXdmState,
+            "Pointeur de fin invalide.",
+        ));
     }
     let end = pointer as usize;
-    if end.checked_add(FOOTER.len()).is_none_or(|footer_end| footer_end > bytes.len())
+    if end
+        .checked_add(FOOTER.len())
+        .is_none_or(|footer_end| footer_end > bytes.len())
         || &bytes[end..end + FOOTER.len()] != FOOTER
     {
-        return Err(AppError::new(ErrorKind::CorruptXdmState, "Marqueur END. absent ou invalide."));
+        return Err(AppError::new(
+            ErrorKind::CorruptXdmState,
+            "Marqueur END. absent ou invalide.",
+        ));
     }
 
     let mut reader = Reader::new(&bytes[4..end]);
@@ -142,7 +169,10 @@ fn parse_state(path: &Path, bytes: &[u8]) -> Result<XdmState, AppError> {
             ));
         }
         if !duration_seconds.is_finite() || duration_seconds < 0.0 {
-            return Err(AppError::new(ErrorKind::CorruptXdmState, format!("Segment {index} : durée invalide.")));
+            return Err(AppError::new(
+                ErrorKind::CorruptXdmState,
+                format!("Segment {index} : durée invalide."),
+            ));
         }
         if downloaded < 0 || size < -1 {
             return Err(AppError::new(
@@ -151,7 +181,13 @@ fn parse_state(path: &Path, bytes: &[u8]) -> Result<XdmState, AppError> {
             ));
         }
 
-        segments.push(XdmSegment { id, url, stream_index, status, duration_seconds });
+        segments.push(XdmSegment {
+            id,
+            url,
+            stream_index,
+            status,
+            duration_seconds,
+        });
     }
 
     Ok(XdmState {
@@ -210,7 +246,9 @@ mod tests {
         let bytes = sample_state();
         let adapter = Adapter;
         assert!(adapter.recognizes("chunks.db.1", &bytes));
-        let state = adapter.parse(Path::new("/tmp/chunks.db.1"), &bytes).unwrap();
+        let state = adapter
+            .parse(Path::new("/tmp/chunks.db.1"), &bytes)
+            .unwrap();
         assert_eq!(state.version, "8.0.29");
         assert_eq!(state.segments.len(), 2);
         assert_eq!(state.segments[0].id, "second");

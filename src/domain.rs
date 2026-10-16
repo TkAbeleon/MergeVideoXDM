@@ -38,8 +38,7 @@ impl ProgressSnapshot {
     pub fn record(&mut self, update: ProgressUpdate) {
         self.fraction = update.fraction.clamp(0.0, 1.0);
         self.stage = update.stage;
-        if !update.message.is_empty()
-            && self.logs.last().is_none_or(|last| last != &update.message)
+        if !update.message.is_empty() && self.logs.last().is_none_or(|last| last != &update.message)
         {
             self.logs.push(update.message);
             if self.logs.len() > 200 {
