@@ -305,8 +305,7 @@ fn job_card<'a>(job: &'a Job) -> Element<'a, Message> {
         .into(),
     };
 
-    let progress = progress_bar(0.0..=1.0, snapshot.fraction)
-        .height(Length::Fixed(7.0));
+    let progress = progress_bar(0.0..=1.0, snapshot.fraction);
 
     let stage_name = if snapshot.stage.is_empty() {
         "En attente".to_string()
