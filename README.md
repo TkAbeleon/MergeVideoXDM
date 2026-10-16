@@ -1,158 +1,169 @@
 # MergeVideoXDM
 
-**Interface graphique légère pour récupérer et assembler les segments HLS temporaires de XDM 8.0.29 avec le FFmpeg du système.**
+**Application de bureau Linux légère pour assembler les segments HLS temporaires de XDM avec le FFmpeg installé sur le système.**
 
-MergeVideoXDM lit l'ordre des segments conservé par XDM dans `chunks.db.1` ou `chunks.db.2`, puis demande à FFmpeg de les assembler dans cet ordre, sans réencodage. L'application est écrite en Rust avec Iced ; son interface est native (pas de navigateur intégré) et contient ses propres icônes SVG. Elle prend en charge X11 et Wayland.
+MergeVideoXDM utilise Rust et Iced, une interface graphique native sans navigateur intégré. Les icônes SVG sont embarquées dans le binaire. X11 et Wayland sont activés, avec rendu logiciel Tiny-Skia pour éviter l'obligation d'un GPU récent.
 
-> **Important :** ce programme vise le format de téléchargement de XDM **8.0.29**. Il ne doit pas être considéré comme compatible avec les versions réécrites qui utilisent un autre format d'état.
+> **État du projet :** version initiale en cours de validation. Le support fonctionnel est actuellement limité au format de métadonnées de **XDM 8.0.29**. L'architecture permet d'ajouter d'autres formats, mais chaque format doit être implémenté et testé. La compatibilité avec une autre version n'est pas affirmée avant vérification sur des fichiers réels de cette version.
 
-## Fonctions
+## Fonctionnalités
 
-- Ajout de plusieurs dossiers temporaires XDM dans une file d'attente.
-- Traitement de 1 à 4 dossiers en parallèle, selon les ressources disponibles.
-- Nom de sortie configurable par tâche et sélection d'un dossier de sortie commun.
-- Détection de FFmpeg au démarrage et affichage des erreurs de traitement.
-- Mode sûr par défaut : une tâche avec segments absents ou non terminés n'est pas assemblée comme si elle était complète.
-- Mode de récupération partielle, explicitement activable, pour tenter de sauver les segments réellement présents.
-- Assemblage par FFmpeg avec `-c copy` : aucune conversion vidéo/audio n'est demandée.
-- Pour les tâches contenant des pistes vidéo et audio distinctes, création de pistes temporaires puis multiplexage sans réencodage.
-- Les fichiers d'origine `chunks.db.*` et les segments de XDM ne sont jamais modifiés ni supprimés.
-- Dialogues de dossiers via XDG Desktop Portal lorsque le bureau Linux le prend en charge.
+- Sélection de **plusieurs dossiers en une seule opération**.
+- File d'attente avec état indépendant pour chaque dossier.
+- Nom de fichier cible et chemin de sortie configurables.
+- Traitement configurable de 1 à 4 tâches en parallèle.
+- Barre de progression par tâche basée sur les événements de progression de FFmpeg ; l'étape de traitement est également affichée.
+- Vue détaillée individuelle : journal, étape en cours, diagnostic, cause et conseil pour résoudre les erreurs.
+- Catégories d'erreurs explicites : état XDM illisible ou non reconnu, segments manquants, FFmpeg absent ou échoué, nom de sortie invalide, conflit de sortie et erreur de fichier.
+- Mode sûr par défaut ; récupération partielle facultative, identifiée clairement.
+- Assemblage sans réencodage : FFmpeg copie les flux et ne convertit pas la vidéo ou l'audio.
+- Aucune modification ni suppression des fichiers source XDM.
+- Refus d'écraser une sortie existante, y compris si un autre processus la crée pendant le traitement.
 
-## Captures et versions
+## Compatibilité
 
-Les builds Linux sont publiés dans l'onglet [Releases](https://github.com/TkAbeleon/MergeVideoXDM/releases). Les archives de compilation comprennent le binaire, le fichier `.desktop`, l'icône et un script d'installation utilisateur.
+| Composant | État |
+|---|---|
+| Linux x86_64 | Cible CI |
+| Linux ARM64 / aarch64 | Cible CI |
+| X11 | Activé |
+| Wayland | Activé |
+| FFmpeg | Fourni par le système |
+| XDM 8.0.29 | Adaptateur implémenté ; tests unitaires du format |
+| Autres versions XDM | Architecture prête pour des adaptateurs ; compatibilité non validée |
 
-## Utilisation
+La compatibilité du binaire avec différentes distributions dépend aussi de leurs bibliothèques système et portails de sélection de dossiers. La CI Linux est configurée pour compiler sur les runners x86_64 et ARM64 ; elle ne garantit pas que chaque paquet de chaque distribution sera binaire-compatible.
 
-### 1. Installer FFmpeg
+## Installation de FFmpeg
 
-FFmpeg doit être disponible dans `PATH` et exécutable par la commande `ffmpeg`.
+Le programme ne fournit pas de copie privée de FFmpeg. La commande **ffmpeg** doit être accessible via **PATH**.
 
-Fedora (dépôt activé proposant le paquet) :
+Fedora (si le paquet est disponible dans les dépôts configurés) :
 
-```bash
-sudo dnf install ffmpeg
-```
+    sudo dnf install ffmpeg
 
 Debian / Ubuntu :
 
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
+    sudo apt update
+    sudo apt install ffmpeg
 
 Arch Linux :
 
-```bash
-sudo pacman -S ffmpeg
-```
+    sudo pacman -S ffmpeg
 
-Les noms de paquets et les dépôts peuvent varier selon la distribution. Le programme ne fournit pas de copie privée de FFmpeg.
+## Utilisation
 
-### 2. Mettre le téléchargement XDM à l'abri
+1. Mets en pause le téléchargement concerné dans XDM et ferme XDM proprement.
+2. Sauvegarde son dossier temporaire avant toute récupération.
+3. Lance MergeVideoXDM.
+4. Clique sur **Ajouter plusieurs dossiers** et sélectionne tous les dossiers de tâches voulus dans le sélecteur.
+5. Choisis le dossier de sortie commun, puis ajuste le nom cible pour chaque tâche.
+6. Choisis le nombre de traitements simultanés (commence par 1 ou 2 sur un PC modeste).
+7. Clique sur **Démarrer / relancer**. Déplie **Voir les détails** sur une tâche pour consulter son journal ou le diagnostic d'une erreur.
 
-1. Dans XDM, mets le téléchargement concerné en pause.
-2. Ferme XDM proprement avant d'inspecter ou de récupérer ses données.
-3. Fais une copie de sauvegarde du dossier temporaire concerné.
+Un dossier de tâche XDM est habituellement situé sous :
 
-Le dossier à ajouter est normalement de la forme :
+    ~/.xdm-app-data/Data/temp/<identifiant-de-tache>/
 
-```text
-~/.xdm-app-data/Data/temp/<identifiant-de-tache>/
-```
+Le dossier doit contenir **chunks.db.1** ou **chunks.db.2** et les segments temporaires associés. Ajoute le dossier spécifique de la tâche, pas son dossier parent temp.
 
-Ce dossier doit contenir `chunks.db.1` ou `chunks.db.2` ainsi que les segments temporaires associés. **Sélectionne le dossier de tâche qui contient ces fichiers**, pas le dossier parent `temp` ni le dossier `recovered` créé par un autre outil.
+Les extensions de sortie actuellement autorisées sont .mp4, .mkv, .ts, .mov et .m4v. Le codec n'est pas réencodé automatiquement : si un conteneur ne convient pas aux codecs de la source, FFmpeg peut refuser le traitement. Un conteneur MKV ou TS peut être plus adapté selon le flux.
 
-### 3. Assembler les vidéos
+### Comprendre la progression
 
-1. Lance `mergevideoxdm`.
-2. Clique sur **Ajouter un dossier XDM** et sélectionne le dossier temporaire d'une tâche. Répète l'opération pour ajouter d'autres tâches.
-3. Choisis le dossier de sortie. Par défaut, il s'agit de `~/Videos/MergeVideoXDM`.
-4. Pour chaque tâche, saisis un nom de fichier cible, par exemple `ma-video.mp4`. L'extension autorisée doit être `.mp4`, `.mkv`, `.ts`, `.mov` ou `.m4v`.
-5. Choisis le nombre de traitements simultanés. Pour une machine modeste, commence par 1 ou 2.
-6. Clique sur **Démarrer / relancer**.
+La barre est calculée à partir des événements de progression émis par FFmpeg, rapportés à la durée cumulée indiquée par la base XDM. Certaines variantes de flux ne donnent pas une durée fiable ; dans ce cas, la progression peut rester basse ou avancer par à-coups. La barre atteint 100 % uniquement quand FFmpeg termine avec succès et que la sortie a été validée. Une tâche en échec ne doit jamais être interprétée comme terminée.
 
-Le programme refuse d'écraser un fichier de sortie existant. Choisis un autre nom ou déplace le résultat déjà présent. Les tâches qui réussissent affichent le chemin du fichier créé ; celles qui échouent présentent un message et peuvent être relancées séparément.
+### Récupération partielle
 
-### Mode sûr et récupération partielle
+Par défaut, tous les segments doivent être présents et marqués Finished. Si des fichiers manquent ou sont incomplets, le programme n'assemble rien en mode sûr et affiche les problèmes détectés.
 
-Par défaut, tous les segments doivent être présents et marqués `Finished` dans l'état XDM. Si cette vérification échoue, aucune sortie n'est créée pour cette tâche.
+L'option **Autoriser une récupération partielle** tente d'assembler les segments présents. Le résultat peut être tronqué, présenter des coupures ou s'arrêter avant la fin. Cette option ne peut pas reconstituer des données jamais téléchargées.
 
-L'option **Autoriser une récupération partielle** permet de tenter l'assemblage avec les segments présents même lorsque certains segments sont incomplets ou absents. La sortie sera explicitement indiquée comme partielle ; elle peut présenter des coupures, des artefacts ou s'arrêter avant la fin. Cette option ne recrée pas les données non téléchargées.
+## Architecture modulaire
 
-## Limites connues
+    src/
+    ├── main.rs           Entrée du programme
+    ├── app/
+    │   ├── mod.rs        État UI, file d'attente, multitâche et progression
+    │   └── ui.rs         Présentation Iced et vues individuelles
+    ├── domain.rs         Requêtes, rapports et valeurs de progression partagées
+    ├── errors.rs         Erreurs typées et diagnostics lisibles
+    ├── ffmpeg.rs         Processus FFmpeg, manifeste, progression et stderr
+    ├── merge.rs          Orchestration indépendante de XDM
+    └── xdm/
+        ├── mod.rs        Contrat d'adaptateur et détection des formats
+        └── v829.rs       Lecteur de l'état binaire XDM 8.0.29
 
-- La base `chunks.db.*` est ici interprétée comme le format binaire de XDM 8.0.29. Le programme n'essaie pas de déduire arbitrairement l'ordre depuis les noms de fichiers.
-- Les segments HLS classiques, notamment `.ts`, sont la cible principale.
-- Le programme ne déchiffre pas les playlists HLS AES-128 et ne reconstruit pas les playlists fMP4 qui nécessitent un segment d'initialisation `#EXT-X-MAP`.
-- Aucun réencodage n'est lancé. Les codecs incompatibles avec le conteneur demandé peuvent donc faire échouer FFmpeg ; essaie `.mkv` ou `.ts` selon le type de flux.
-- L'interface ne prétend pas afficher un pourcentage de progression de FFmpeg lorsqu'il n'est pas mesuré. Une tâche reste indiquée comme en cours jusqu'au retour du processus.
-- Pour les fenêtres de sélection de dossier via portail XDG, un portail compatible du bureau (par exemple GTK ou KDE) doit être installé. Si le portail n'est pas disponible, la distribution peut nécessiter `zenity`.
+Les icônes SVG sont dans assets/icons/. Le packaging Linux et la CI sont dans packaging/ et .github/workflows/.
+
+### Ajouter une autre version de XDM
+
+Le moteur de fusion ne doit pas analyser directement les structures binaires d'une version particulière. Chaque version doit se trouver dans un adaptateur qui implémente le contrat XdmStateAdapter :
+
+1. Créer un nouveau module dans src/xdm/ (par exemple v830.rs).
+2. Implémenter version(), recognizes() et parse().
+3. Convertir le format de cette version vers le modèle commun XdmState et XdmSegment, en conservant strictement l'ordre des segments fourni par XDM.
+4. Enregistrer l'adaptateur dans src/xdm/mod.rs.
+5. Ajouter des fixtures représentatives et des tests d'ordre, de corruption, de versions non reconnues et de chemins de segments.
+6. Vérifier la récupération sur un dossier de tâche réel de cette version avant de déclarer la compatibilité.
+
+Un adaptateur ne doit pas déduire l'ordre en triant les noms de fichiers. Il doit utiliser la source d'ordre réellement enregistrée par la version concernée.
 
 ## Compilation depuis les sources
 
 ### Prérequis
 
-- Rust stable 1.88 ou plus récent (l'édition 2024 est utilisée).
-- FFmpeg pour les tests manuels et l'exécution.
-- Les bibliothèques de développement nécessaires à X11 / Wayland et à `pkg-config`.
+- Rust stable 1.88 ou plus récent (édition 2024).
+- FFmpeg pour exécuter et tester le traitement.
+- Compilateur C, pkg-config, dépendances de développement X11/Wayland/DBus.
 
 Fedora :
 
-```bash
-sudo dnf install gcc gcc-c++ make pkgconf-pkg-config libxkbcommon-devel libxkbcommon-x11-devel libX11-devel libXcursor-devel libXi-devel libXrandr-devel wayland-devel libxcb-devel dbus-devel
-```
+    sudo dnf install gcc gcc-c++ make pkgconf-pkg-config libxkbcommon-devel libxkbcommon-x11-devel libX11-devel libXcursor-devel libXi-devel libXrandr-devel wayland-devel libxcb-devel dbus-devel
 
 Debian / Ubuntu :
 
-```bash
-sudo apt install build-essential pkg-config libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-randr0-dev libxcb-xinerama0-dev libxcb-cursor-dev libdbus-1-dev
-```
+    sudo apt install build-essential pkg-config libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-randr0-dev libxcb-xinerama0-dev libxcb-cursor-dev libdbus-1-dev
 
 Arch Linux :
 
-```bash
-sudo pacman -S --needed base-devel pkgconf libx11 libxkbcommon libxkbcommon-x11 wayland libxcb dbus
-```
+    sudo pacman -S --needed base-devel pkgconf libx11 libxkbcommon libxkbcommon-x11 wayland libxcb dbus
 
-### Construire et lancer
+Construire :
 
-```bash
-git clone https://github.com/TkAbeleon/MergeVideoXDM.git
-cd MergeVideoXDM
-cargo test
-cargo build --release
-./target/release/mergevideoxdm
-```
+    git clone https://github.com/TkAbeleon/MergeVideoXDM.git
+    cd MergeVideoXDM
+    cargo fmt --all -- --check
+    cargo test --all-targets
+    cargo build --release
+    ./target/release/mergevideoxdm
 
-Iced utilise le moteur de rendu logiciel `tiny-skia` pour ne pas imposer un GPU moderne. Les backends de fenêtre X11 et Wayland sont activés. La construction depuis les sources requiert néanmoins les dépendances de développement indiquées ci-dessus.
+Pour une machine modeste, limite le nombre de fusions simultanées à 1 ou 2 : chaque tâche peut lire plusieurs segments sur le disque et démarrer des processus FFmpeg.
 
-## CI et artefacts Linux
+## CI et publications
 
-GitHub Actions exécute le formatage, les tests et la compilation sur Linux x86_64 et ARM64. Le workflow de publication est déclenché par un tag de version `v*` et publie une archive Linux pour chaque architecture construite.
+Le workflow Linux CI vérifie le formatage Rust, lance les tests et compile des binaires pour Linux x86_64 et ARM64. Le workflow Release prépare des archives Linux sur un tag v*, avec un fichier SHA-256.
 
-Exemple de création d'une version :
+Créer une publication :
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+    git tag v0.1.0
+    git push origin v0.1.0
 
-## Arborescence du projet
+Les artefacts et le résultat réel des pipelines sont consultables dans [GitHub Actions](https://github.com/TkAbeleon/MergeVideoXDM/actions).
 
-```text
-src/main.rs          Interface Iced, file d'attente et multitâche
-src/merge.rs         Lecture de chunks.db et orchestration FFmpeg
-assets/icons/        Icônes SVG intégrées et icône de l'application
-packaging/           Entrée de menu et script d'installation utilisateur
-.github/workflows/   CI Linux et publication des artefacts
-```
+## Limites fonctionnelles
 
-## Sécurité des données
+- L'adaptateur implémenté cible le format d'état de XDM 8.0.29.
+- Le programme ne déchiffre pas les flux HLS AES-128.
+- Les playlists fMP4 nécessitant le segment d'initialisation #EXT-X-MAP ne sont pas encore reconstruites.
+- La progression peut être approximative si la durée cumulée des segments est absente ou incorrecte.
+- Les codecs incompatibles avec le conteneur demandé peuvent faire échouer le mode copie ; aucun réencodage n'est lancé automatiquement.
+- Les dialogues de sélection multiple dépendent du backend fourni par rfd et de la configuration du bureau Linux.
 
-MergeVideoXDM ne contacte aucun service externe, ne modifie pas les métadonnées de XDM et ne supprime aucun segment source. Tous les résultats sont écrits dans le dossier de sortie choisi. Avant récupération d'un téléchargement en cours ou bloqué, effectue tout de même une sauvegarde du dossier temporaire XDM.
+## Données et sécurité
+
+MergeVideoXDM ne contacte pas de service externe. Il lit l'état XDM et les segments, puis écrit la sortie dans le dossier choisi. Il ne modifie pas et ne supprime pas les fichiers temporaires sources. Garde cependant une sauvegarde de la tâche XDM avant récupération.
 
 ## Licence
 
-Le projet est sous licence MIT. Voir [LICENSE](LICENSE).
+Licence MIT — voir LICENSE.
