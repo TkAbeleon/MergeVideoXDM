@@ -1,0 +1,27 @@
+[package]
+name = "mergevideoxdm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Interface graphique Linux pour assembler les segments HLS temporaires de XDM 8.0.29 avec FFmpeg"
+license = "MIT"
+repository = "https://github.com/TkAbeleon/MergeVideoXDM"
+readme = "README.md"
+
+[dependencies]
+iced = { version = "0.14.0", default-features = false, features = ["tiny-skia", "svg", "tokio", "x11", "wayland", "linux-theme-detection"] }
+rfd = { version = "0.16.0", default-features = false, features = ["xdg-portal", "tokio", "wayland"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+tempfile = "3.23"
+url = "2.5"
+percent-encoding = "2.3"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[profile.dev]
+debug = 1

@@ -1,0 +1,91 @@
+name: Linux release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Package Linux (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libx11-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxcb-randr0-dev libxcb-xinerama0-dev libxcb-cursor-dev \
+            libdbus-1-dev
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Format, test and build
+        run: |
+          cargo fmt --all
+          cargo test --all-targets
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Package archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="MergeVideoXDM-linux-${{ matrix.arch }}"
+          mkdir -p "dist/${package}"
+          install -m 755 "target/${{ matrix.target }}/release/mergevideoxdm" "dist/${package}/mergevideoxdm"
+          install -m 644 README.md LICENSE "dist/${package}/"
+          install -m 644 packaging/mergevideoxdm.desktop "dist/${package}/mergevideoxdm.desktop"
+          install -m 644 assets/icons/app-mark.svg "dist/${package}/mergevideoxdm.svg"
+          install -m 755 packaging/install.sh "dist/${package}/install.sh"
+          tar -C dist -czf "dist/${package}.tar.gz" "${package}"
+          sha256sum "dist/${package}.tar.gz" > "dist/${package}.tar.gz.sha256"
+
+      - name: Upload package for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.arch }}
+          path: |
+            dist/MergeVideoXDM-linux-${{ matrix.arch }}.tar.gz
+            dist/MergeVideoXDM-linux-${{ matrix.arch }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all architecture packages
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: package-*
+          merge-multiple: true
+
+      - name: Create release and attach archives
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256

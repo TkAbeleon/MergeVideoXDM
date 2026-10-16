@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MergeVideoXDM
+GenericName=Assembleur de vidéos XDM
+Comment=Assembler les segments HLS temporaires de XDM avec FFmpeg
+Exec=mergevideoxdm
+Icon=mergevideoxdm
+Terminal=false
+Categories=AudioVideo;Video;Utility;
+StartupNotify=true
