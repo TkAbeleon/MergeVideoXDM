@@ -89,9 +89,9 @@ jobs:
           install -m 644 assets/icons/app-mark.svg "dist/${package}/mergevideoxdm.svg"
           install -m 755 packaging/install.sh "dist/${package}/install.sh"
           tar -czf "dist/${package}.tar.gz" -C dist "${package}"
-          sha256sum "dist/${package}.tar.gz" \
-            "dist/${package}.deb" "dist/${package}.rpm" \
-            > "dist/MergeVideoXDM-linux-${{ matrix.arch }}.sha256"
+          (cd dist && sha256sum "${package}.tar.gz" \
+            "${package}.deb" "${package}.rpm" \
+            > "MergeVideoXDM-linux-${{ matrix.arch }}.sha256")
 
       - name: Upload Linux packages and archive
         uses: actions/upload-artifact@v4
