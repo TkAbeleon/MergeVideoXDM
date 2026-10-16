@@ -17,6 +17,7 @@ MergeVideoXDM utilise Rust et Iced, une interface graphique native sans navigate
 - Catégories d'erreurs explicites : état XDM illisible ou non reconnu, segments manquants, FFmpeg absent ou échoué, nom de sortie invalide, conflit de sortie et erreur de fichier.
 - Mode sûr par défaut ; récupération partielle facultative, identifiée clairement.
 - Assemblage sans réencodage : FFmpeg copie les flux et ne convertit pas la vidéo ou l'audio.
+- Pistes vidéo et audio séparées assemblées en **une seule passe FFmpeg**, sans fichier intermédiaire (moins d'écriture disque et d'espace temporaire) ; repli automatique sur l'ancien enchaînement en trois étapes si la passe unique échoue.
 - Aucune modification ni suppression des fichiers source XDM.
 - Refus d'écraser une sortie existante, y compris si un autre processus la crée pendant le traitement.
 
