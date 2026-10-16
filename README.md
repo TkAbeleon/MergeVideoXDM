@@ -35,7 +35,7 @@ MergeVideoXDM utilise Rust et Iced, une interface graphique native sans navigate
 | XDM 8.0.29 | Adaptateur implémenté ; tests unitaires du format |
 | Autres versions XDM | Architecture prête pour des adaptateurs ; compatibilité non validée |
 
-La compatibilité du binaire avec différentes distributions dépend aussi de leurs bibliothèques système et portails de sélection de dossiers. La CI Linux compile et empacte les binaires x86_64 et ARM64 ; elle ne garantit pas que chaque paquet fonctionnera sur toutes les versions de distribution.
+La compatibilité du binaire avec différentes distributions dépend aussi de leurs bibliothèques système et portails de sélection de dossiers. La CI Linux compile et empaquette les binaires x86_64 et ARM64 ; elle ne garantit pas que chaque paquet fonctionnera sur toutes les versions de distribution.
 
 ## Installation
 

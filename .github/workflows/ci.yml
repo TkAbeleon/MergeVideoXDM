@@ -33,7 +33,7 @@ jobs:
           sudo apt-get install -y build-essential pkg-config dpkg-dev libx11-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev \
             libxcb-xfixes0-dev libxcb-randr0-dev libxcb-xinerama0-dev libxcb-cursor-dev \
-            libdbus-1-dev
+            libdbus-1-dev rpm
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
@@ -71,7 +71,8 @@ jobs:
         run: |
           set -euo pipefail
           dpkg-deb --info "dist/MergeVideoXDM-linux-${{ matrix.arch }}.deb"
-          test -s "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
+          rpm -qip "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
+          rpm -qlp "dist/MergeVideoXDM-linux-${{ matrix.arch }}.rpm"
 
       - name: Stage portable archive
         shell: bash
@@ -84,7 +85,7 @@ jobs:
           install -m 644 packaging/mergevideoxdm.desktop "dist/${package}/mergevideoxdm.desktop"
           install -m 644 assets/icons/app-mark.svg "dist/${package}/mergevideoxdm.svg"
           install -m 755 packaging/install.sh "dist/${package}/install.sh"
-          tar -C dist -czf "dist/${package}.tar.gz" "${package}"
+          tar -czf "dist/${package}.tar.gz" -C dist "${package}"
           sha256sum "dist/${package}.tar.gz" \
             "dist/${package}.deb" "dist/${package}.rpm" \
             > "dist/MergeVideoXDM-linux-${{ matrix.arch }}.sha256"
